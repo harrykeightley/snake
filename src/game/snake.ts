@@ -40,8 +40,6 @@ export const snakePlugin = (world: World): World => {
     .addSystemDependency(shout, tick);
 };
 
-const BOUNDS = createPosition(10, 10);
-
 /**
  * A system that will run the timer stored in the TIMER resource, and emit tick events.
  */
@@ -50,7 +48,8 @@ const tick = createTimerSystemForResource(Keys.resources.TIMER, 'tick');
 /**
  * A helper which forces a system to only be run after a tick event is received.
  */
-const requireTick = (system: System) => requireEvents(['tick'], system);
+const requireTick = (system: System) =>
+  requireEvents([Keys.events.TICK], system);
 
 /**
  * A logging system.
@@ -77,6 +76,7 @@ shout = requireTick(shout);
 const addInitialData: System = async () => {
   const food = createPosition(2, 4);
 
+  const BOUNDS = createPosition(10, 10);
   const intention = new Intention()
     .addResource(Keys.resources.BOUNDS, BOUNDS)
     .addResource(Keys.resources.TIMER, new Timer(1000, Keys.events.TICK))
@@ -110,13 +110,11 @@ let moveHead: System = async world => {
     [Keys.components.BODY]: 0,
   };
 
-  // NOTE: Commentiing out the add bundle makes this work, so somehow its affecting the rest of the world.
   const intention = new Intention()
     .setResource(Keys.resources.HEAD, head)
     .updateAllComponents<number>(Keys.components.BODY, n => n + 1)
     .addBundle(headBundle);
 
-  console.log(intention);
   return intention;
 };
 moveHead = requireTick(moveHead);
@@ -146,9 +144,9 @@ let foodCollision: System = async world => {
   const head = world.getResource<Position>(Keys.resources.HEAD)!;
   const food = world.getResource<Position>(Keys.resources.FOOD)!;
 
-  const results = new Intention();
+  let results = new Intention();
   if (equals(head, food)) {
-    results.addEvent(Keys.events.DINNER, 'ATE');
+    results = results.addEvent('dinner', 'ATE');
   }
   return results;
 };
@@ -161,7 +159,7 @@ let eat: System = async world => {
   ]);
   const takenPositions = components.map(Util.first) as Position[];
   const generatePotentialFood = (): Position => {
-    const {x, y} = BOUNDS;
+    const {x, y} = world.getResource<Position>(Keys.resources.BOUNDS)!;
     return {x: randomInt(x), y: randomInt(y)};
   };
 
@@ -174,7 +172,7 @@ let eat: System = async world => {
     .updateResource<number>(Keys.resources.LENGTH, n => n + 1)
     .setResource<Position>(Keys.resources.FOOD, food);
 };
-eat = requireEvents([Keys.events.DINNER], eat);
+eat = requireEvents(['dinner'], eat);
 
 const changeDirection: System = async world => {
   const controllerEvents = world.getEvents<Control>(Keys.events.CONTROLS);
