@@ -16,7 +16,7 @@
     "posttest": "npm run lint"
   },
   "dependencies": {
-    "@persephia/chaos-engine": "^0.0.8",
+    "@persephia/chaos-engine": "^0.2.2",
     "pixi.js": "^7.3.3",
     "ramda": "^0.29.1",
     "react": "^18.2.0",

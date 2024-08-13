@@ -1,30 +1,34 @@
 import {
-  Entity,
   System,
-  SystemResults,
+  Intention,
   Util,
   World,
+  ReservedKeys,
+  EntityID,
+  RealEntity,
+  ReservedStages,
 } from '@persephia/chaos-engine';
 import * as PIXI from 'pixi.js';
-import {Keys, Position} from './types';
+import {Position} from './types';
+import {Keys, Stages} from './keys';
 
 const PIXELS = 360;
 
 export const graphicsPlugin = (world: World): World => {
   return world
-    .addSystem(initialisePixi, 'start-up')
+    .addSystem(initialisePixi, ReservedStages.START_UP)
     .addSystem(clearSquares)
-    .addSystem(renderSquares, 'graphics');
+    .addSystem(renderSquares, Stages.GRAPHICS);
 };
 
-const initialisePixi: System = () => {
+const initialisePixi: System = async () => {
   const app = new PIXI.Application<HTMLCanvasElement>({
     width: PIXELS,
     height: PIXELS,
   });
   document.getElementById('canvas')?.appendChild(app.view);
 
-  return new SystemResults().add(['resources', 'app'], app);
+  return new Intention().addResource(Keys.resources.PIXI, app);
 };
 
 const renderSquare = (
@@ -48,15 +52,19 @@ const renderSquare = (
   return square;
 };
 
-const renderSquares: System = world => {
-  const components = world.query<[Entity, Position]>(['id', Keys.POSITION]);
-  const ids = components.map(Util.first) as Entity[];
+const renderSquares: System = async world => {
+  const components = world.query<[EntityID, Position]>([
+    ReservedKeys.ID,
+    Keys.components.POSITION,
+  ]);
+  const entities = components.map(Util.first) as EntityID[];
   const positions = components.map(Util.second) as Position[];
+  const ids: RealEntity[] = entities.map(id => ({exists: true, id}));
 
-  const head = world.getResource<Position>(Keys.HEAD)!;
-  const food = world.getResource<Position>(Keys.FOOD)!;
-  const app = world.getResource<PIXI.Application>('app')!;
-  const bounds = world.getResource<Position>(Keys.BOUNDS)!;
+  const head = world.getResource<Position>(Keys.resources.HEAD)!;
+  const food = world.getResource<Position>(Keys.resources.FOOD)!;
+  const app = world.getResource<PIXI.Application>(Keys.resources.PIXI)!;
+  const bounds = world.getResource<Position>(Keys.resources.BOUNDS)!;
 
   const colour = (position: Position) => {
     if (position === head) return 'white';
@@ -68,15 +76,12 @@ const renderSquares: System = world => {
   const squares = positions.map(pos =>
     renderSquare(app, bounds, new PIXI.Color(colour(pos)), pos)
   );
-  return new SystemResults().set(['components', 'square'], squares, ids);
+  renderSquare(app, bounds, new PIXI.Color(colour(food)), food);
+  return new Intention().setComponents(Keys.components.SQUARE, squares, ids);
 };
 
-const clearSquares: System = world => {
-  const app = world.getResource<PIXI.Application>('app')!;
-
-  const components = world.query<[Entity, PIXI.Graphics]>(['id', 'square']);
-  const ids = components.map(Util.first) as Entity[];
-
+const clearSquares: System = async world => {
+  const app = world.getResource<PIXI.Application>(Keys.resources.PIXI)!;
   app.stage.removeChildren();
-  return new SystemResults().delete(['components', 'square'], undefined, ids);
+  return new Intention().deleteAllComponentsOfName(Keys.components.SQUARE);
 };
